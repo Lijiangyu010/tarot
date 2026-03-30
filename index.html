@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mystic Weave Tarot - 神秘编织塔罗</title>
+  <meta name="description" content="Mystic Weave Tarot - 基于莱德韦特塔罗体系的三张牌阵在线占卜">
+  <link rel="stylesheet" href="css/style.css">
+  <!-- 预加载关键资源 -->
+  <link rel="preload" href="images/牌背.jpg" as="image">
+</head>
+<body>
+  <!-- ===== 顶部导航栏 ===== -->
+  <header class="navbar">
+    <div class="navbar-inner">
+      <!-- Logo -->
+      <a href="index.html" class="logo">
+        <svg class="logo-icon" viewBox="0 0 48 48" width="40" height="40" aria-hidden="true">
+          <circle cx="24" cy="24" r="10" fill="none" stroke="#c9a84c" stroke-width="1.5"/>
+          <circle cx="20" cy="22" r="8" fill="#c9a84c" opacity="0.85"/>
+          <path d="M32 8l1 3 3 1-3 1-1 3-1-3-3-1 3-1z" fill="#fff" opacity="0.9"/>
+          <path d="M38 16l0.7 2 2 0.7-2 0.7-0.7 2-0.7-2-2-0.7 2-0.7z" fill="#fff" opacity="0.6"/>
+          <path d="M12 36l0.5 1.5 1.5 0.5-1.5 0.5-0.5 1.5-0.5-1.5-1.5-0.5 1.5-0.5z" fill="#fff" opacity="0.5"/>
+        </svg>
+        <span class="logo-text">Mystic Weave Tarot</span>
+      </a>
+      <!-- 桌面端导航 -->
+      <nav class="nav-links" id="navLinks">
+        <a href="index.html" class="nav-item active">HOME</a>
+        <a href="#reading-section" class="nav-item">READINGS</a>
+      </nav>
+      <!-- 右侧操作 -->
+      <div class="nav-actions">
+        <button class="btn-icon" id="btnScreenshot" title="截图分享" aria-label="截图分享">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+        </button>
+        <!-- 汉堡菜单（移动端） -->
+        <button class="hamburger" id="hamburger" aria-label="菜单" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+    <!-- 移动端导航面板 -->
+    <div class="mobile-nav" id="mobileNav">
+      <a href="index.html" class="mobile-nav-item active">HOME</a>
+      <a href="#reading-section" class="mobile-nav-item">READINGS</a>
+    </div>
+  </header>
+
+  <!-- ===== 主内容区 ===== -->
+  <main class="main-wrapper" id="reading-section">
+    <div class="content-area">
+      <!-- 左侧/主占卜区 -->
+      <section class="reading-zone">
+        <!-- 标题 -->
+        <h1 class="section-title">THE THREE-CARD SPREAD READING</h1>
+        <p class="section-hint">1. Focus on your question. Then, shuffle and cut the deck.</p>
+
+        <!-- 操作按钮 -->
+        <div class="action-buttons">
+          <button class="btn btn-shuffle" id="btnShuffle">SHUFFLE DECK</button>
+          <button class="btn btn-cut" id="btnCut" disabled>CUT DECK</button>
+          <button class="btn btn-start" id="btnStart" disabled>START READING</button>
+        </div>
+
+        <!-- 牌堆展示区 -->
+        <div class="deck-area" id="deckArea">
+          <div class="deck-stack" id="deckStack">
+            <!-- JS 动态生成牌堆 -->
+          </div>
+        </div>
+
+        <!-- 放牌区标题 -->
+        <h2 class="drawing-title">DRAWING AREA</h2>
+
+        <!-- 三张牌放置区 -->
+        <div class="drawing-area" id="drawingArea">
+          <div class="card-slot" id="slot0">
+            <div class="card-placeholder">
+              <div class="placeholder-border"></div>
+            </div>
+            <span class="slot-label">1. PAST</span>
+          </div>
+          <div class="card-slot" id="slot1">
+            <div class="card-placeholder">
+              <div class="placeholder-border"></div>
+            </div>
+            <span class="slot-label">2. PRESENT</span>
+          </div>
+          <div class="card-slot" id="slot2">
+            <div class="card-placeholder">
+              <div class="placeholder-border"></div>
+            </div>
+            <span class="slot-label">3. FUTURE</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 右侧侧边栏（桌面端） -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-section">
+          <h3 class="sidebar-label">Current Question:</h3>
+          <textarea class="question-input" id="questionInput" placeholder="Type your question here..." rows="3" maxlength="200"></textarea>
+        </div>
+        <div class="sidebar-section">
+          <h3 class="sidebar-label">Interpretation:</h3>
+          <div class="interpretation-content" id="interpretationContent">
+            <p class="interpretation-placeholder">Draw your cards to reveal the reading...</p>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- 移动端折叠面板 -->
+    <div class="mobile-panel" id="mobilePanel">
+      <button class="panel-toggle" id="panelToggle" aria-expanded="false">
+        <span>Question &amp; Interpretation</span>
+        <svg class="panel-arrow" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+      <div class="panel-body" id="panelBody">
+        <div class="panel-section">
+          <h3 class="panel-label">Current Question:</h3>
+          <textarea class="question-input" id="questionInputMobile" placeholder="Type your question here..." rows="2" maxlength="200"></textarea>
+        </div>
+        <div class="panel-section">
+          <h3 class="panel-label">Interpretation:</h3>
+          <div class="interpretation-content" id="interpretationContentMobile">
+            <p class="interpretation-placeholder">Draw your cards to reveal the reading...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ===== 重置按钮（占卜完成后显示） ===== -->
+  <div class="reset-wrapper" id="resetWrapper" style="display:none;">
+    <button class="btn btn-reset" id="btnReset">NEW READING</button>
+  </div>
+
+  <!-- JS -->
+  <script src="js/tarot-data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
