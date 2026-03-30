@@ -328,6 +328,15 @@ body::before {
   pointer-events: none;
 }
 
+/* 牌堆可点击抽牌态 */
+.deck-stack[style*="pointer"] .deck-card {
+  cursor: pointer;
+}
+.deck-stack[style*="pointer"] .deck-card:hover {
+  transform: translateY(-4px) !important;
+  box-shadow: 0 0 20px rgba(201, 168, 76, 0.5), 0 4px 15px rgba(0, 0, 0, 0.5);
+}
+
 /* 扇形洗牌动画 - 各张牌在JS中设置不同角度 */
 .deck-card.fanned {
   transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
