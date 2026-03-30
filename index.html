@@ -7,7 +7,9 @@
   <meta name="description" content="Mystic Weave Tarot - 基于莱德韦特塔罗体系的三张牌阵在线占卜">
   <link rel="stylesheet" href="css/style.css">
   <!-- 预加载关键资源 -->
-  <link rel="preload" href="images/牌背.jpg" as="image">
+  <link rel="preload" href="images/card_back.webp" as="image">
+  <!-- 截图库 -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" defer></script>
 </head>
 <body>
   <!-- ===== 顶部导航栏 ===== -->
@@ -22,12 +24,12 @@
           <path d="M38 16l0.7 2 2 0.7-2 0.7-0.7 2-0.7-2-2-0.7 2-0.7z" fill="#fff" opacity="0.6"/>
           <path d="M12 36l0.5 1.5 1.5 0.5-1.5 0.5-0.5 1.5-0.5-1.5-1.5-0.5 1.5-0.5z" fill="#fff" opacity="0.5"/>
         </svg>
-        <span class="logo-text">Mystic Weave Tarot</span>
+        <span class="logo-text">塔罗</span>
       </a>
       <!-- 桌面端导航 -->
       <nav class="nav-links" id="navLinks">
-        <a href="index.html" class="nav-item active">HOME</a>
-        <a href="#reading-section" class="nav-item">READINGS</a>
+        <a href="index.html" class="nav-item active">首页</a>
+        <a href="#reading-section" class="nav-item">占卜</a>
       </nav>
       <!-- 右侧操作 -->
       <div class="nav-actions">
@@ -45,8 +47,8 @@
     </div>
     <!-- 移动端导航面板 -->
     <div class="mobile-nav" id="mobileNav">
-      <a href="index.html" class="mobile-nav-item active">HOME</a>
-      <a href="#reading-section" class="mobile-nav-item">READINGS</a>
+      <a href="index.html" class="mobile-nav-item active">首页</a>
+      <a href="#reading-section" class="mobile-nav-item">占卜</a>
     </div>
   </header>
 
@@ -56,14 +58,14 @@
       <!-- 左侧/主占卜区 -->
       <section class="reading-zone">
         <!-- 标题 -->
-        <h1 class="section-title">THE THREE-CARD SPREAD READING</h1>
-        <p class="section-hint">1. Focus on your question. Then, shuffle and cut the deck.</p>
+        <h1 class="section-title">三张牌阵占卜</h1>
+        <p class="section-hint">1. 专注于你的问题，然后洗牌并切牌。</p>
 
         <!-- 操作按钮 -->
         <div class="action-buttons">
-          <button class="btn btn-shuffle" id="btnShuffle">SHUFFLE DECK</button>
-          <button class="btn btn-cut" id="btnCut" disabled>CUT DECK</button>
-          <button class="btn btn-start" id="btnStart" disabled>START READING</button>
+          <button class="btn btn-shuffle" id="btnShuffle">洗 牌</button>
+          <button class="btn btn-cut" id="btnCut" disabled>切 牌</button>
+          <button class="btn btn-start" id="btnStart" disabled>开始占卜</button>
         </div>
 
         <!-- 牌堆展示区 -->
@@ -74,7 +76,7 @@
         </div>
 
         <!-- 放牌区标题 -->
-        <h2 class="drawing-title">DRAWING AREA</h2>
+        <h2 class="drawing-title">放 牌 区</h2>
 
         <!-- 三张牌放置区 -->
         <div class="drawing-area" id="drawingArea">
@@ -82,19 +84,19 @@
             <div class="card-placeholder">
               <div class="placeholder-border"></div>
             </div>
-            <span class="slot-label">1. PAST</span>
+            <span class="slot-label">1</span>
           </div>
           <div class="card-slot" id="slot1">
             <div class="card-placeholder">
               <div class="placeholder-border"></div>
             </div>
-            <span class="slot-label">2. PRESENT</span>
+            <span class="slot-label">2</span>
           </div>
           <div class="card-slot" id="slot2">
             <div class="card-placeholder">
               <div class="placeholder-border"></div>
             </div>
-            <span class="slot-label">3. FUTURE</span>
+            <span class="slot-label">3</span>
           </div>
         </div>
       </section>
@@ -102,13 +104,13 @@
       <!-- 右侧侧边栏（桌面端） -->
       <aside class="sidebar" id="sidebar">
         <div class="sidebar-section">
-          <h3 class="sidebar-label">Current Question:</h3>
-          <textarea class="question-input" id="questionInput" placeholder="Type your question here..." rows="3" maxlength="200"></textarea>
+          <h3 class="sidebar-label">当前问题：</h3>
+          <textarea class="question-input" id="questionInput" placeholder="在此输入你的问题..." rows="3" maxlength="200"></textarea>
         </div>
         <div class="sidebar-section">
-          <h3 class="sidebar-label">Interpretation:</h3>
+          <h3 class="sidebar-label">牌义解读：</h3>
           <div class="interpretation-content" id="interpretationContent">
-            <p class="interpretation-placeholder">Draw your cards to reveal the reading...</p>
+            <p class="interpretation-placeholder">抽牌后将在此显示解读...</p>
           </div>
         </div>
       </aside>
@@ -117,20 +119,20 @@
     <!-- 移动端折叠面板 -->
     <div class="mobile-panel" id="mobilePanel">
       <button class="panel-toggle" id="panelToggle" aria-expanded="false">
-        <span>Question &amp; Interpretation</span>
+        <span>问题 &amp; 牌义解读</span>
         <svg class="panel-arrow" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="6 9 12 15 18 9"/>
         </svg>
       </button>
       <div class="panel-body" id="panelBody">
         <div class="panel-section">
-          <h3 class="panel-label">Current Question:</h3>
-          <textarea class="question-input" id="questionInputMobile" placeholder="Type your question here..." rows="2" maxlength="200"></textarea>
+          <h3 class="panel-label">当前问题：</h3>
+          <textarea class="question-input" id="questionInputMobile" placeholder="在此输入你的问题..." rows="2" maxlength="200"></textarea>
         </div>
         <div class="panel-section">
-          <h3 class="panel-label">Interpretation:</h3>
+          <h3 class="panel-label">牌义解读：</h3>
           <div class="interpretation-content" id="interpretationContentMobile">
-            <p class="interpretation-placeholder">Draw your cards to reveal the reading...</p>
+            <p class="interpretation-placeholder">抽牌后将在此显示解读...</p>
           </div>
         </div>
       </div>
@@ -139,7 +141,7 @@
 
   <!-- ===== 重置按钮（占卜完成后显示） ===== -->
   <div class="reset-wrapper" id="resetWrapper" style="display:none;">
-    <button class="btn btn-reset" id="btnReset">NEW READING</button>
+    <button class="btn btn-reset" id="btnReset">重新占卜</button>
   </div>
 
   <!-- JS -->

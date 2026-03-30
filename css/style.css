@@ -43,8 +43,8 @@ body::before {
   content: '';
   position: fixed;
   inset: 0;
-  background: url('images/desk.png') center/cover no-repeat;
-  opacity: 0.18;
+  background: url('../images/desk.webp') center/cover no-repeat;
+  opacity: 0.22;
   z-index: -2;
   pointer-events: none;
 }
@@ -640,8 +640,8 @@ body::before {
 @media (max-width: 767px) {
   /* 背景切换为手机端 */
   body::before {
-    background-image: url('images/mobiles.png');
-    opacity: 0.22;
+    background-image: url('../images/mobiles.webp');
+    opacity: 0.25;
   }
 
   .nav-links { display: none; }
