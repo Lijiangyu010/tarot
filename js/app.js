@@ -239,8 +239,12 @@
         var topPart = state.deck.splice(cutPos);
         state.deck = topPart.concat(state.deck);
 
-        // 重建干净的牌堆
-        buildDeckStack();
+        // 清除动画残留样式，不重建DOM避免抽搐
+        cards.forEach(function (c) {
+          c.style.transition = '';
+          c.style.transform = '';
+        });
+
         state.phase = 'cut';
         unlockUI();
       }, 450);
