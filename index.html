@@ -45,12 +45,11 @@
       <section class="reading-zone">
         <!-- 标题 -->
         <h1 class="section-title">三牌阵占卜</h1>
-        <p class="section-hint">专注于你的问题，然后洗牌并切牌。</p>
+        <p class="section-hint" id="sectionHint">专注于你的问题，然后点击洗牌。</p>
 
         <!-- 操作按钮 -->
-        <div class="action-buttons">
+        <div class="action-buttons" id="actionButtons">
           <button class="btn btn-shuffle" id="btnShuffle">洗 牌</button>
-          <button class="btn btn-cut" id="btnCut" disabled>切 牌</button>
           <button class="btn btn-start" id="btnStart" disabled>开始占卜</button>
         </div>
 
@@ -61,8 +60,36 @@
           </div>
         </div>
 
+        <!-- 轮盘选牌区 -->
+        <div class="wheel-wrapper" id="wheelWrapper" style="display:none">
+          <p class="wheel-hint">滑动旋转轮盘，点击选牌</p>
+          <div class="wheel-viewport" id="wheelViewport">
+            <div class="wheel-ring" id="wheelRing">
+              <!-- JS 动态生成 78 张牌 -->
+            </div>
+          </div>
+          <!-- 放牌区（在轮盘下方，不受遮罩影响） -->
+          <div class="wheel-drawing-area" id="wheelDrawingArea">
+            <h2 class="drawing-title wheel-drawing-title">放 牌 区</h2>
+            <div class="drawing-area" id="wheelSlots">
+              <div class="card-slot" id="wSlot0">
+                <div class="card-placeholder"><div class="placeholder-border"></div></div>
+                <span class="slot-label">&nbsp;</span>
+              </div>
+              <div class="card-slot" id="wSlot1">
+                <div class="card-placeholder"><div class="placeholder-border"></div></div>
+                <span class="slot-label">&nbsp;</span>
+              </div>
+              <div class="card-slot" id="wSlot2">
+                <div class="card-placeholder"><div class="placeholder-border"></div></div>
+                <span class="slot-label">&nbsp;</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- 放牌区标题 -->
-        <h2 class="drawing-title">放 牌 区</h2>
+        <h2 class="drawing-title" id="drawingTitle">放 牌 区</h2>
 
         <!-- 三张牌放置区 -->
         <div class="drawing-area" id="drawingArea">

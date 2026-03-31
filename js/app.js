@@ -1,34 +1,47 @@
-/**
- * Mystic Weave Tarot - 主交互逻辑
- * 洗牌 → 切牌 → 点击牌堆手动抽牌 → 3D翻牌 → 牌义展示
+﻿/**
+ * LiTarot - 主交互逻辑
+ * 洗牌 → 轮盘选牌 → 3D翻牌 → 牌义展示（含逆位）
  */
 (function () {
   'use strict';
 
   /* ===== 状态管理 ===== */
   var state = {
-    phase: 'idle',        // idle | shuffled | cut | drawing | drawn
+    phase: 'idle',
     deck: [],
     drawnCards: [],
     drawIndex: 0,
     flippedCount: 0,
-    animating: false
+    animating: false,
+    wheelAngle: 0,
+    dragging: false,
+    dragMoved: false,
+    lastPointerAngle: 0,
+    baseRadius: 0
   };
 
   /* ===== DOM 缓存 ===== */
   var $ = function (sel) { return document.querySelector(sel); };
-  var btnShuffle   = $('#btnShuffle');
-  var btnCut       = $('#btnCut');
-  var btnStart     = $('#btnStart');
-  var btnReset     = $('#btnReset');
-  var deckStack    = $('#deckStack');
-  var deckArea     = $('#deckArea');
-  var resetWrapper = $('#resetWrapper');
-  var panelToggle  = $('#panelToggle');
-  var panelBody    = $('#panelBody');
+  var btnShuffle    = $('#btnShuffle');
+  var btnStart      = $('#btnStart');
+  var btnReset      = $('#btnReset');
+  var deckStack     = $('#deckStack');
+  var deckArea      = $('#deckArea');
+  var wheelWrapper  = $('#wheelWrapper');
+  var wheelViewport = $('#wheelViewport');
+  var wheelRing     = $('#wheelRing');
+  var resetWrapper  = $('#resetWrapper');
+  var panelToggle   = $('#panelToggle');
+  var panelBody     = $('#panelBody');
+  var sectionHint   = $('#sectionHint');
+  var sectionTitle  = $('.section-title');
+  var actionButtons = $('#actionButtons');
+  var drawingTitle  = $('#drawingTitle');
+  var drawingArea   = $('#drawingArea');
 
   var VISUAL_CARD_COUNT = 35;
   var STACK_COUNT = 8;
+  var REVERSE_CHANCE = 0.35;
 
   /* ===== 初始化 ===== */
   function init() {
@@ -48,7 +61,6 @@
     });
   }
 
-  /* 生成牌堆（静态叠放） */
   function buildDeckStack() {
     deckStack.innerHTML = '';
     for (var i = 0; i < STACK_COUNT; i++) {
@@ -64,20 +76,15 @@
       card.appendChild(img);
       deckStack.appendChild(card);
     }
-    // 移除牌堆点击态（非抽牌阶段）
     deckStack.style.cursor = 'default';
   }
 
-  /* ===== 按钮状态控制 ===== */
+  /* ===== 按钮状态 ===== */
   function updateButtons() {
     var a = state.animating;
     var p = state.phase;
-
     btnShuffle.disabled = a || (p !== 'idle' && p !== 'shuffled');
-    btnCut.disabled     = a || (p !== 'shuffled' && p !== 'cut');
-    btnStart.disabled   = a || p !== 'cut';
-
-    // 重置按钮：三张牌全部翻开后才出现
+    btnStart.disabled   = a || p !== 'shuffled';
     resetWrapper.style.display = (state.flippedCount >= 3) ? '' : 'none';
   }
 
@@ -87,12 +94,8 @@
   /* ===== 事件绑定 ===== */
   function bindEvents() {
     btnShuffle.addEventListener('click', handleShuffle);
-    btnCut.addEventListener('click', handleCut);
     btnStart.addEventListener('click', handleStartReading);
     btnReset.addEventListener('click', handleReset);
-
-    // 点击牌堆抽牌
-    deckStack.addEventListener('click', handleDeckClick);
 
     if (panelToggle) {
       panelToggle.addEventListener('click', function () {
@@ -105,7 +108,7 @@
     if (btnScreenshot) btnScreenshot.addEventListener('click', handleScreenshot);
   }
 
-  /* ===== 生成随机散牌位置 ===== */
+  /* ===== 随机散牌位置 ===== */
   function randomPositions(cards, maxX, maxY) {
     var total = cards.length;
     cards.forEach(function (card) {
@@ -117,13 +120,18 @@
     });
   }
 
-  /* ===== 洗牌（散开 → 打乱重排 → 再打乱 → 收拢） ===== */
+  /* ===== 洗牌 ===== */
   function handleShuffle() {
     if (state.animating) return;
     lockUI();
 
-    // Fisher-Yates 洗牌
-    state.deck = [].concat(TAROT_DECK);
+    // Fisher-Yates 洗牌 + 随机逆位
+    state.deck = TAROT_DECK.map(function (card) {
+      var copy = {};
+      for (var k in card) copy[k] = card[k];
+      copy.reversed = Math.random() < REVERSE_CHANCE;
+      return copy;
+    });
     for (var i = state.deck.length - 1; i > 0; i--) {
       var j = Math.floor(Math.random() * (i + 1));
       var tmp = state.deck[i];
@@ -132,9 +140,11 @@
     }
 
     resetSlots();
+    wheelWrapper.style.display = 'none';
+    deckArea.style.display = '';
+
     deckStack.innerHTML = '';
     var total = VISUAL_CARD_COUNT;
-
     var areaW = deckArea.offsetWidth;
     var maxX = Math.min(areaW * 0.38, 260);
     var maxY = 90;
@@ -155,7 +165,6 @@
     var cards = Array.from(deckStack.querySelectorAll('.deck-card'));
     void deckStack.offsetHeight;
 
-    // 阶段1：散开
     requestAnimationFrame(function () {
       cards.forEach(function (c) {
         c.style.transition = 'transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1)';
@@ -163,7 +172,6 @@
       randomPositions(cards, maxX, maxY);
     });
 
-    // 阶段2：打乱重排（第一次搅动）
     setTimeout(function () {
       cards.forEach(function (c) {
         c.style.transition = 'transform 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
@@ -171,7 +179,6 @@
       randomPositions(cards, maxX, maxY);
     }, 700);
 
-    // 阶段3：打乱重排（第二次搅动）
     setTimeout(function () {
       cards.forEach(function (c) {
         c.style.transition = 'transform 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
@@ -179,127 +186,229 @@
       randomPositions(cards, maxX, maxY);
     }, 1250);
 
-    // 阶段4：收拢回牌堆
     setTimeout(function () {
       cards.forEach(function (c) {
         c.style.transition = 'transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
         c.style.transform = 'translate(0, 0) rotate(0deg)';
       });
-
       setTimeout(function () {
         buildDeckStack();
         state.phase = 'shuffled';
+        if (sectionHint) sectionHint.textContent = '洗牌完成，点击「开始占卜」展开轮盘选牌。';
         unlockUI();
       }, 550);
     }, 1800);
   }
 
-  /* ===== 切牌（上半叠抬起右移 → 放回底下） ===== */
-  function handleCut() {
-    if (state.animating) return;
-    if (state.phase !== 'shuffled' && state.phase !== 'cut') return;
-    lockUI();
-
-    // 每次切牌前重建牌堆，确保DOM干净
-    buildDeckStack();
-    void deckStack.offsetHeight;
-
-    var cards = Array.from(deckStack.querySelectorAll('.deck-card'));
-    var total = cards.length;
-    var cutIndex = Math.floor(total / 2);
-
-    // 上半部分（z-index >= cutIndex，视觉上在上面）
-    var topCards = cards.filter(function (_, i) { return i >= cutIndex; });
-    var bottomCards = cards.filter(function (_, i) { return i < cutIndex; });
-
-    // 阶段1：上半部分抬起右移
-    topCards.forEach(function (card) {
-      card.style.transition = 'transform 0.45s ease-out';
-      card.style.transform = 'translateY(-75px) translateX(50px)';
-    });
-
-    // 阶段2：上半部分z-index降到底下，下半部分升高
-    setTimeout(function () {
-      topCards.forEach(function (card, i) {
-        card.style.zIndex = i;
-      });
-      bottomCards.forEach(function (card, i) {
-        card.style.zIndex = i + topCards.length;
-      });
-
-      // 上半部分回到原位（现在在底下了）
-      topCards.forEach(function (card) {
-        card.style.transition = 'transform 0.4s ease-in';
-        card.style.transform = 'translateY(0) translateX(0)';
-      });
-
-      setTimeout(function () {
-        // 数据层切牌
-        var cutPos = Math.floor(Math.random() * (state.deck.length - 10)) + 5;
-        var topPart = state.deck.splice(cutPos);
-        state.deck = topPart.concat(state.deck);
-
-        // 清除transform，然后平滑调整top/left到新z-index对应的位置
-        cards.forEach(function (c) {
-          c.style.transform = '';
-          var z = parseInt(c.style.zIndex) || 0;
-          c.style.transition = 'top 0.3s ease, left 0.3s ease';
-          c.style.top = -(z * 2) + 'px';
-          c.style.left = (z * 1) + 'px';
-        });
-
-        setTimeout(function () {
-          cards.forEach(function (c) {
-            c.style.transition = '';
-          });
-          state.phase = 'cut';
-          unlockUI();
-        }, 350);
-      }, 450);
-    }, 500);
-  }
-
-  /* ===== 开始占卜：滚动到牌堆+放牌区，启用手动抽牌 ===== */
+  /* ===== 开始占卜：展开轮盘 ===== */
   function handleStartReading() {
-    if (state.animating || state.phase !== 'cut') return;
+    if (state.animating || state.phase !== 'shuffled') return;
+    lockUI();
     state.phase = 'drawing';
-    state.drawnCards = state.deck.slice(0, 3);
+    state.drawnCards = [];
     state.drawIndex = 0;
     updateButtons();
 
-    // 平滑滚动，让牌堆顶部对齐视口顶部（按钮刚好看不见）
-    var deckTop = deckArea.getBoundingClientRect().top + window.pageYOffset;
-    var navbarH = document.querySelector('.navbar') ? document.querySelector('.navbar').offsetHeight : 0;
-    window.scrollTo({
-      top: deckTop - navbarH - 8,
-      behavior: 'smooth'
-    });
+    if (sectionHint) sectionHint.textContent = '滑动旋转轮盘，点击选牌（共需选3张）';
 
-    // 设置牌堆为可点击态
-    deckStack.style.cursor = 'pointer';
+    // 记录牌堆位置，用于展开动画起点
+    var deckRect = deckStack.getBoundingClientRect();
+    var deckCenterX = deckRect.left + deckRect.width / 2;
+    var deckCenterY = deckRect.top + deckRect.height / 2;
+
+    deckArea.style.display = 'none';
+    drawingTitle.style.display = 'none';
+    drawingArea.style.display = 'none';
+    wheelWrapper.style.display = '';
+
+    setTimeout(function () {
+      buildWheel(deckCenterX, deckCenterY);
+    }, 350);
   }
 
-  /* ===== 点击牌堆手动抽牌 ===== */
-  function handleDeckClick() {
+  /* ===== 轮盘构建（带展开动画） ===== */
+  function buildWheel(fromX, fromY) {
+    wheelRing.innerHTML = '';
+    state.wheelAngle = 0;
+    state.baseRadius = getBaseRadius();
+    wheelRing.style.transform = 'rotate(0deg)';
+
+    var total = state.deck.length;  // 78
+    var radius = state.baseRadius;
+    var angleStep = 360 / total;
+
+    for (var i = 0; i < total; i++) {
+      // 目标角度：从0°(正上方)开始顺时针排列，card#1在顶部正中
+      var targetAngle = angleStep * i;
+      var card = document.createElement('div');
+      card.className = 'wheel-card';
+      card.dataset.index = i;
+      card.dataset.angle = targetAngle;
+      // 初始：全部叠在顶部正中（牌堆位置）
+      card.style.transform = 'rotate(0deg) translateY(-' + radius + 'px)';
+      card.style.transition = 'none';
+      // z-index：按角度离顶部的距离，越远越高（防止竖屏相邻牌遮挡点击区）
+      var angleDist = targetAngle <= 180 ? targetAngle : 360 - targetAngle;
+      card.style.zIndex = Math.round(angleDist) + 1;
+
+      var img = document.createElement('img');
+      img.src = CARD_BACK_IMAGE;
+      img.alt = '牌 ' + (i + 1);
+      img.draggable = false;
+      card.appendChild(img);
+
+      var num = document.createElement('span');
+      num.className = 'card-number';
+      num.textContent = i + 1;
+      card.appendChild(num);
+
+      card.addEventListener('click', handleWheelCardClick);
+      wheelRing.appendChild(card);
+    }
+
+    // 从顶部正中（牌堆位置）顺时针展开：每张牌依次延迟飞到目标位置
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        var allCards = wheelRing.querySelectorAll('.wheel-card');
+        for (var j = 0; j < allCards.length; j++) {
+          var a = parseFloat(allCards[j].dataset.angle);
+          var delay = j * 14;
+          allCards[j].style.transition = 'transform 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94) ' + delay + 'ms';
+          allCards[j].style.transform = 'rotate(' + a + 'deg) translateY(-' + radius + 'px)';
+        }
+      });
+    });
+
+    var totalAnimTime = 78 * 14 + 900 + 100;
+    setTimeout(function () {
+      var allCards = wheelRing.querySelectorAll('.wheel-card');
+      for (var j = 0; j < allCards.length; j++) {
+        allCards[j].style.transition = 'transform 0.3s ease';
+      }
+      bindWheelEvents();
+      unlockUI();
+    }, totalAnimTime);
+  }
+
+  function getBaseRadius() {
+    var vh = wheelViewport.offsetHeight;
+    var rootStyles = getComputedStyle(document.documentElement);
+    var cardH = parseInt(rootStyles.getPropertyValue('--card-h'));
+    // 确保顶部牌（0°）完全在视口内：vh - radius - cardH/2 >= 5
+    return Math.floor(vh - cardH / 2 - 5);
+  }
+
+  /* ===== 轮盘旋转事件（无缩放） ===== */
+  function bindWheelEvents() {
+    wheelViewport.addEventListener('mousedown', onPointerDown);
+    window.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('mouseup', onPointerUp);
+    wheelViewport.addEventListener('touchstart', onTouchStart, { passive: false });
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('touchend', onTouchEnd);
+  }
+
+  function cleanupWheelEvents() {
+    wheelViewport.removeEventListener('mousedown', onPointerDown);
+    window.removeEventListener('mousemove', onPointerMove);
+    window.removeEventListener('mouseup', onPointerUp);
+    wheelViewport.removeEventListener('touchstart', onTouchStart);
+    window.removeEventListener('touchmove', onTouchMove);
+    window.removeEventListener('touchend', onTouchEnd);
+  }
+
+  function getAngleFromCenter(x, y) {
+    var rect = wheelViewport.getBoundingClientRect();
+    var cx = rect.left + rect.width / 2;
+    var cy = rect.bottom;
+    return Math.atan2(y - cy, x - cx) * (180 / Math.PI);
+  }
+
+  /* --- Mouse --- */
+  function onPointerDown(e) {
+    if (e.button !== 0) return;
+    state.dragging = true;
+    state.dragMoved = false;
+    state.lastPointerAngle = getAngleFromCenter(e.clientX, e.clientY);
+    e.preventDefault();
+  }
+  function onPointerMove(e) {
+    if (!state.dragging) return;
+    var angle = getAngleFromCenter(e.clientX, e.clientY);
+    var delta = angle - state.lastPointerAngle;
+    if (delta > 180) delta -= 360;
+    if (delta < -180) delta += 360;
+    if (Math.abs(delta) > 0.3) state.dragMoved = true;
+    state.wheelAngle += delta;
+    state.lastPointerAngle = angle;
+    applyWheelTransform();
+  }
+  function onPointerUp() {
+    state.dragging = false;
+  }
+
+  /* --- Touch --- */
+  function onTouchStart(e) {
+    if (e.touches.length === 1) {
+      state.dragging = true;
+      state.dragMoved = false;
+      state.lastPointerAngle = getAngleFromCenter(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  }
+  function onTouchMove(e) {
+    if (e.touches.length === 1 && state.dragging) {
+      var t = e.touches[0];
+      var angle = getAngleFromCenter(t.clientX, t.clientY);
+      var delta = angle - state.lastPointerAngle;
+      if (delta > 180) delta -= 360;
+      if (delta < -180) delta += 360;
+      if (Math.abs(delta) > 0.3) state.dragMoved = true;
+      state.wheelAngle += delta;
+      state.lastPointerAngle = angle;
+      applyWheelTransform();
+      e.preventDefault();
+    }
+  }
+  function onTouchEnd(e) {
+    if (e.touches.length === 0) {
+      state.dragging = false;
+    }
+  }
+
+  function applyWheelTransform() {
+    wheelRing.style.transition = 'none';
+    wheelRing.style.transform = 'rotate(' + state.wheelAngle + 'deg)';
+  }
+
+  /* ===== 点击轮盘牌抽牌 ===== */
+  function handleWheelCardClick(e) {
     if (state.phase !== 'drawing') return;
     if (state.animating) return;
     if (state.drawIndex >= 3) return;
+    if (state.dragMoved) return;
 
-    drawOneCard();
+    var target = e.currentTarget;
+    if (target.classList.contains('drawn')) return;
+
+    var idx = parseInt(target.dataset.index);
+    var cardData = state.deck[idx];
+    state.drawnCards.push(cardData);
+    target.classList.add('drawn');
+
+    drawCardFromWheel(target, cardData);
   }
 
-  function drawOneCard() {
+  function drawCardFromWheel(wheelCard, cardData) {
     lockUI();
-    var cardData = state.drawnCards[state.drawIndex];
     var slotIndex = state.drawIndex;
-    var slot = $('#slot' + slotIndex);
+    // 使用轮盘内嵌的放牌区
+    var slot = $('#wSlot' + slotIndex);
     var placeholder = slot.querySelector('.card-placeholder');
 
     var rootStyles = getComputedStyle(document.documentElement);
     var cardW = parseInt(rootStyles.getPropertyValue('--card-w'));
     var cardH = parseInt(rootStyles.getPropertyValue('--card-h'));
 
-    // 飞行牌
     var flyCard = document.createElement('div');
     flyCard.className = 'deck-card';
     flyCard.style.width = cardW + 'px';
@@ -311,12 +420,10 @@
     img.draggable = false;
     flyCard.appendChild(img);
 
-    // 起始位置
-    var deckRect = deckStack.getBoundingClientRect();
-    var startX = deckRect.left + deckRect.width / 2 - cardW / 2;
-    var startY = deckRect.top + deckRect.height / 2 - cardH / 2;
+    var wcRect = wheelCard.getBoundingClientRect();
+    var startX = wcRect.left + wcRect.width / 2 - cardW / 2;
+    var startY = wcRect.top + wcRect.height / 2 - cardH / 2;
 
-    // 目标位置
     var slotRect = placeholder.getBoundingClientRect();
     var endX = slotRect.left;
     var endY = slotRect.top;
@@ -326,14 +433,12 @@
     flyCard.style.top = startY + 'px';
     flyCard.style.zIndex = '200';
     flyCard.style.transition = 'none';
-    flyCard.style.boxShadow = '0 0 15px rgba(201, 168, 76, 0.4)';
     document.body.appendChild(flyCard);
 
     void flyCard.offsetHeight;
-    flyCard.style.transition = 'all 0.85s cubic-bezier(0.22, 1, 0.36, 1)';
+    flyCard.style.transition = 'left 0.6s cubic-bezier(0.22, 1, 0.36, 1), top 0.6s cubic-bezier(0.22, 1, 0.36, 1)';
     flyCard.style.left = endX + 'px';
     flyCard.style.top = endY + 'px';
-    flyCard.style.boxShadow = '0 0 30px rgba(201, 168, 76, 0.6), 0 0 60px rgba(201, 168, 76, 0.2)';
 
     setTimeout(function () {
       if (flyCard.parentNode) document.body.removeChild(flyCard);
@@ -342,13 +447,60 @@
 
       if (state.drawIndex >= 3) {
         state.phase = 'drawn';
-        deckStack.style.cursor = 'default';
+        if (sectionHint) sectionHint.textContent = '点击牌面翻牌查看解读。';
+        foldWheelToDeck();
       }
       unlockUI();
-    }, 900);
+    }, 650);
   }
 
-  /* 放置可翻转牌 */
+  /* ===== 轮盘折叠回牌堆 ===== */
+  function foldWheelToDeck() {
+    var allCards = wheelRing.querySelectorAll('.wheel-card');
+    var radius = state.baseRadius;
+
+    // 所有牌收拢回顶部正中（牌堆位置），依次延迟
+    for (var i = 0; i < allCards.length; i++) {
+      var delay = i * 8;
+      allCards[i].style.transition = 'transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) ' + delay + 'ms, opacity 0.4s ' + delay + 'ms';
+      allCards[i].style.transform = 'rotate(0deg) translateY(-' + radius + 'px)';
+    }
+
+    setTimeout(function () {
+      // 将轮盘内的放牌区卡牌移到主放牌区
+      moveWheelSlotsToMain();
+      wheelWrapper.style.display = 'none';
+      cleanupWheelEvents();
+      deckArea.style.display = '';
+      drawingTitle.style.display = '';
+      drawingArea.style.display = '';
+      buildDeckStack();
+    }, 1200);
+  }
+
+  /* 将轮盘内放牌区的卡牌移到主放牌区 */
+  function moveWheelSlotsToMain() {
+    for (var i = 0; i < 3; i++) {
+      var wSlot = $('#wSlot' + i);
+      var mainSlot = $('#slot' + i);
+      if (!wSlot || !mainSlot) continue;
+
+      var placed = wSlot.querySelector('.placed-card');
+      if (placed) {
+        // 隐藏主区的占位框
+        var mainPlaceholder = mainSlot.querySelector('.card-placeholder');
+        if (mainPlaceholder) mainPlaceholder.style.display = 'none';
+        // 移动卡牌到主区
+        mainSlot.insertBefore(placed, mainSlot.querySelector('.slot-label'));
+      }
+      // 复制标签文本
+      var wLabel = wSlot.querySelector('.slot-label');
+      var mainLabel = mainSlot.querySelector('.slot-label');
+      if (wLabel && mainLabel) mainLabel.textContent = wLabel.textContent;
+    }
+  }
+
+  /* ===== 放置可翻转牌 ===== */
   function placeFlipper(slot, cardData, slotIndex) {
     var placeholder = slot.querySelector('.card-placeholder');
     placeholder.style.display = 'none';
@@ -369,6 +521,7 @@
 
     var back = document.createElement('div');
     back.className = 'flip-card-back';
+    if (cardData.reversed) back.classList.add('reversed');
     var backImg = document.createElement('img');
     backImg.src = cardData.image;
     backImg.alt = cardData.nameCN;
@@ -379,16 +532,20 @@
     inner.appendChild(back);
     flipContainer.appendChild(inner);
 
-    // 点击翻牌
     flipContainer.addEventListener('click', function handler() {
       if (inner.classList.contains('flipped')) return;
       inner.classList.add('flipped');
       state.flippedCount++;
       flipContainer.removeEventListener('click', handler);
 
-      // 翻牌后底下显示牌名
-      var label = slot.querySelector('.slot-label');
-      if (label) label.textContent = cardData.nameCN;
+      // 动态找到当前父级 slot 的 label（牌可能已从 wSlot 移到 mainSlot）
+      var parentSlot = flipContainer.closest('.card-slot');
+      var label = parentSlot ? parentSlot.querySelector('.slot-label') : null;
+      if (label) {
+        label.textContent = cardData.reversed
+          ? cardData.nameCN + '（逆位）'
+          : cardData.nameCN;
+      }
 
       showInterpretation(cardData, slotIndex);
       updateButtons();
@@ -400,12 +557,15 @@
   /* ===== 牌义展示 ===== */
   function showInterpretation(cardData, slotIndex) {
     var posLabel = '栏位 ' + (slotIndex + 1);
-
+    var orientation = cardData.reversed ? '逆位' : '正位';
+    var kw = cardData.reversed
+      ? (cardData.reversedKeywordsCN || cardData.keywordsCN)
+      : cardData.keywordsCN;
     var html =
       '<div class="interp-card">' +
-        '<div class="interp-position">' + posLabel + ' · 揭牌</div>' +
+        '<div class="interp-position">' + posLabel + ' · ' + orientation + '</div>' +
         '<div class="interp-name">' + cardData.nameCN + '（' + cardData.name + '）</div>' +
-        '<div class="interp-keywords">' + cardData.keywordsCN + '</div>' +
+        '<div class="interp-keywords">' + kw + '</div>' +
       '</div>';
 
     var content = $('#interpretationContentMobile');
@@ -425,28 +585,49 @@
     state.drawIndex = 0;
     state.flippedCount = 0;
     state.animating = false;
+    state.wheelAngle = 0;
+    state.baseRadius = 0;
 
+    cleanupWheelEvents();
+
+    wheelWrapper.style.display = 'none';
+    deckArea.style.display = '';
+    drawingTitle.style.display = '';
+    drawingArea.style.display = '';
     buildDeckStack();
     resetSlots();
+
+    if (sectionHint) sectionHint.textContent = '专注于你的问题，然后点击洗牌。';
 
     var mc = $('#interpretationContentMobile');
     if (mc) mc.innerHTML = '<p class="interpretation-placeholder">抽牌后将在此显示解读...</p>';
 
-    // 滚动回顶部
     window.scrollTo({ top: 0, behavior: 'smooth' });
-
     updateButtons();
   }
 
   function resetSlots() {
     for (var i = 0; i < 3; i++) {
+      // 主放牌区
       var slot = $('#slot' + i);
-      var existing = slot.querySelector('.placed-card');
-      if (existing) existing.remove();
-      var placeholder = slot.querySelector('.card-placeholder');
-      if (placeholder) placeholder.style.display = '';
-      var label = slot.querySelector('.slot-label');
-      if (label) label.innerHTML = '&nbsp;';
+      if (slot) {
+        var existing = slot.querySelector('.placed-card');
+        if (existing) existing.remove();
+        var placeholder = slot.querySelector('.card-placeholder');
+        if (placeholder) placeholder.style.display = '';
+        var label = slot.querySelector('.slot-label');
+        if (label) label.innerHTML = '&nbsp;';
+      }
+      // 轮盘内放牌区
+      var wSlot = $('#wSlot' + i);
+      if (wSlot) {
+        var wExisting = wSlot.querySelector('.placed-card');
+        if (wExisting) wExisting.remove();
+        var wPlaceholder = wSlot.querySelector('.card-placeholder');
+        if (wPlaceholder) wPlaceholder.style.display = '';
+        var wLabel = wSlot.querySelector('.slot-label');
+        if (wLabel) wLabel.innerHTML = '&nbsp;';
+      }
     }
   }
 
